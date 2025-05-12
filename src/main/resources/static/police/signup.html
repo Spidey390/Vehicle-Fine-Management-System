@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Police Signup</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .login-container {
+      background: #1c1c1c;
+      padding: 2rem 3rem;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+      width: 360px;
+    }
+
+    .login-container h2 {
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      padding: 0.7rem;
+      margin-bottom: 1rem;
+      border-radius: 6px;
+      border: none;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 0.7rem;
+      background-color: #00adb5;
+      border: none;
+      color: white;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    a {
+      color: #00adb5;
+      text-align: center;
+      display: block;
+      margin-top: 1rem;
+      text-decoration: none;
+    }
+
+    .message {
+      margin-bottom: 1rem;
+      text-align: center;
+      display: none;
+    }
+
+    .success {
+      color: lightgreen;
+    }
+
+    .error {
+      color: #ff4f4f;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-container">
+    <h2>Police Signup</h2>
+    <div id="message" class="message"></div>
+    <form id="signupForm">
+      <input type="text" id="username" name="username" placeholder="Username" required />
+      <input type="password" id="password" name="password" placeholder="Password" required />
+      <button type="submit">Sign Up</button>
+    </form>
+    <a href="/police/login.html">Already have an account? Login</a>
+  </div>
+
+  <script>
+    document.getElementById('signupForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const messageDiv = document.getElementById('message');
+
+      const response = await fetch('/api/police/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const text = await response.text();
+
+      messageDiv.style.display = 'block';
+
+      if (response.ok) {
+        messageDiv.textContent = 'Signup successful! Redirecting to login...';
+        messageDiv.className = 'message success';
+        setTimeout(() => {
+          window.location.href = '/police/login.html';
+        }, 1500);
+      } else {
+        messageDiv.textContent = text || 'Signup failed.';
+        messageDiv.className = 'message error';
+      }
+    });
+  </script>
+</body>
+
+</html>

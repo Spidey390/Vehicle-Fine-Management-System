@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Police Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      display: flex;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 250px;
+      background: #1c1c1c;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #444;
+    }
+
+    .sidebar h2 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 1.5rem;
+    }
+
+    .sidebar button {
+      background-color: #00adb5;
+      color: white;
+      border: none;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      font-size: 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .main {
+      flex-grow: 1;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+
+    .main h2 {
+      margin-bottom: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #2e2e2e;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid #444;
+    }
+
+    th {
+      background-color: #00adb5;
+      color: white;
+    }
+
+    tr:hover {
+      background-color: #3a3a3a;
+    }
+
+    .btn {
+      padding: 0.4rem 0.8rem;
+      background-color: #00adb5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-right: 0.3rem;
+    }
+
+    .status-unpaid {
+      color: orange;
+    }
+
+    .status-paid {
+      color: lightgreen;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="sidebar">
+    <h2>Police Panel</h2>
+    <button onclick="addFine()">Add Fine</button>
+    <button id="showAllFinesBtn" onclick="loadFines()">Show All Fines</button>
+    <button id="filterUnpaidFinesBtn" onclick="filterUnpaidFines()" style="display:none;">Vehicles with Unpaid
+      Fines</button>
+  </div>
+
+  <div class="main">
+    <h2>All Fines</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Ticket ID</th>
+          <th>Vehicle No</th>
+          <th>Owner</th>
+          <th>Offense</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Data will be loaded dynamically -->
+      </tbody>
+    </table>
+  </div>
+
+  <div id="fineModal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:999;">
+    <div style="background:#1c1c1c; padding:2rem; border-radius:8px; width:320px; color:white;">
+      <h3 style="margin-bottom:1rem;">Add Fine</h3>
+      <input id="vehicleInput" placeholder="Vehicle No" style="width:100%; padding:0.5rem; margin-bottom:0.5rem;" />
+      <input id="ownerInput" placeholder="Owner Username" style="width:100%; padding:0.5rem; margin-bottom:0.5rem;" />
+      <input id="offenseInput" placeholder="Offense" style="width:100%; padding:0.5rem; margin-bottom:0.5rem;" />
+      <input id="amountInput" type="number" placeholder="Amount"
+        style="width:100%; padding:0.5rem; margin-bottom:1rem;" />
+      <div style="text-align:right;">
+        <button class="btn" onclick="submitFine()">Submit</button>
+        <button class="btn" style="background:#555;" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="editModal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:999;">
+    <div style="background:#1c1c1c; padding:2rem; border-radius:8px; width:320px; color:white;">
+      <h3 style="margin-bottom:1rem;">Edit Fine</h3>
+      <input type="hidden" id="editFineId" />
+      <input id="editOffenseInput" placeholder="Offense" style="width:100%; padding:0.5rem; margin-bottom:0.5rem;" />
+      <input id="editAmountInput" type="number" placeholder="Amount"
+        style="width:100%; padding:0.5rem; margin-bottom:0.5rem;" />
+      <label><input type="checkbox" id="editPaidCheckbox" /> Mark as Paid</label>
+      <div style="text-align:right; margin-top:1rem;">
+        <button class="btn" onclick="submitEdit()">Update</button>
+        <button class="btn" style="background:#555;" onclick="closeEditModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    let fines = [];
+    let currentView = 'all'; // 'all' or 'unpaid'
+
+    // Modified loadFines function to use display IDs
+    async function loadFines() {
+      try {
+        const res = await fetch('/api/police/fines');
+        if (!res.ok) {
+          throw new Error(`Failed to load fines: ${res.status} ${res.statusText}`);
+        }
+        fines = await res.json();
+        const tbody = document.querySelector('tbody');
+        tbody.innerHTML = '';
+
+        // Sort fines by internal ID to ensure consistent order
+        fines.sort((a, b) => a.id - b.id);
+
+        // Assign display IDs sequentially
+        fines.forEach((f, index) => {
+          const displayId = index + 1; // Sequential display ID (1, 2, 3...)
+
+          const row = document.createElement('tr');
+          row.innerHTML = `
+        <td>${displayId}</td> <!-- Use display ID here instead of f.id -->
+        <td>${f.vehicleNo}</td>
+        <td>${f.ownerUsername}</td>
+        <td>${f.offense}</td>
+        <td>₹${f.amount}</td>
+        <td class="${f.paid ? 'status-paid' : 'status-unpaid'}">${f.paid ? 'Paid' : 'Unpaid'}</td>
+        <td>${f.date}</td>
+        <td>
+          <button class="btn" onclick="editFine(${f.id})">Edit</button>
+          <button class="btn" onclick="deleteFine(${f.id})">Delete</button>
+        </td>
+      `;
+          tbody.appendChild(row);
+        });
+
+        // Toggle buttons visibility based on current view
+        toggleButtons('all');
+      } catch (err) {
+        console.error('Error loading fines:', err);
+        alert('Error loading fines: ' + err.message);
+      }
+    }
+
+
+function filterUnpaidFines() {
+  const tbody = document.querySelector('tbody');
+  tbody.innerHTML = ''; // Clear current table
+
+  const unpaidFines = fines.filter(f => !f.paid); // Filter unpaid only
+
+  if (unpaidFines.length === 0) {
+    alert("No unpaid fines found.");
+    return;
+  }
+
+  // Assign sequential display IDs to unpaid fines
+  unpaidFines.forEach((f, index) => {
+    const displayId = index + 1; // Sequential display ID (1, 2, 3...)
+    
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${displayId}</td>
+      <td>${f.vehicleNo}</td>
+      <td>${f.ownerUsername}</td>
+      <td>${f.offense}</td>
+      <td>₹${f.amount}</td>
+      <td class="status-unpaid">Unpaid</td>
+      <td>${f.date}</td>
+      <td>
+        <button class="btn" onclick="editFine(${f.id})">Edit</button>
+        <button class="btn" onclick="deleteFine(${f.id})">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  // Toggle buttons visibility based on current view
+  toggleButtons('unpaid');
+}
+
+    function toggleButtons(view) {
+      if (view === 'all') {
+        document.getElementById('showAllFinesBtn').style.display = 'none';
+        document.getElementById('filterUnpaidFinesBtn').style.display = 'block';
+      } else {
+        document.getElementById('showAllFinesBtn').style.display = 'block';
+        document.getElementById('filterUnpaidFinesBtn').style.display = 'none';
+      }
+    }
+
+    window.onload = loadFines;
+
+    function closeModal() {
+      document.getElementById('fineModal').style.display = 'none';
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').style.display = 'none';
+    }
+
+
+    async function submitFine() {
+      const vehicleNo = document.getElementById('vehicleInput').value.trim();
+      const ownerUsername = document.getElementById('ownerInput').value.trim();
+      const offense = document.getElementById('offenseInput').value.trim();
+      const amount = parseInt(document.getElementById('amountInput').value.trim(), 10);
+      const date = new Date().toISOString().split('T')[0]; // Fixed date format
+
+      if (!vehicleNo || !ownerUsername || !offense || isNaN(amount)) {
+        return alert('All fields are required and amount must be a number');
+      }
+
+      try {
+        const res = await fetch('/api/police/fines', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vehicleNo, ownerUsername, offense, amount, date })
+        });
+
+        if (res.ok) {
+          alert('Fine added');
+          closeModal();
+          loadFines();
+        } else {
+          const errorMsg = await res.text(); // Capture error message from response
+          alert('Failed to add fine: ' + errorMsg);
+        }
+      } catch (err) {
+        alert('Error adding fine: ' + err.message);
+      }
+    }
+
+
+
+    function addFine() {
+      // Reset inputs on open
+      document.getElementById('vehicleInput').value = '';
+      document.getElementById('ownerInput').value = '';
+      document.getElementById('offenseInput').value = '';
+      document.getElementById('amountInput').value = '';
+
+      document.getElementById('fineModal').style.display = 'flex';
+    }
+
+
+    async function deleteFine(id) {
+      if (!confirm('Delete this fine?')) return;
+
+      try {
+        const res = await fetch(`/api/police/fines/${id}`, {
+          method: 'DELETE'
+        });
+
+        if (res.ok) {
+          alert('Fine deleted');
+          loadFines();
+        } else {
+          alert('Failed to delete fine');
+        }
+      } catch (err) {
+        alert('Error deleting fine: ' + err.message);
+      }
+    }
+
+    function submitEdit() {
+      const id = document.getElementById('editFineId').value;
+      const offense = document.getElementById('editOffenseInput').value.trim();
+      const amount = parseInt(document.getElementById('editAmountInput').value.trim(), 10);
+      const paid = document.getElementById('editPaidCheckbox').checked;
+
+      if (!offense || isNaN(amount)) {
+        alert("Valid offense and numeric amount are required");
+        return;
+      }
+
+      fetch(`/api/police/fines/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offense, amount, paid })
+      }).then(res => {
+        if (res.ok) {
+          document.getElementById('editModal').style.display = 'none';
+          loadFines();
+        } else {
+          alert("Failed to update fine");
+        }
+      }).catch(err => {
+        alert("Error updating fine: " + err.message);
+      });
+    }
+
+    function editFine(id) {
+      const fine = fines.find(f => f.id === id);
+      if (!fine) return alert("Fine not found");
+
+      document.getElementById('editFineId').value = fine.id;
+      document.getElementById('editOffenseInput').value = fine.offense;
+      document.getElementById('editAmountInput').value = fine.amount;
+      document.getElementById('editPaidCheckbox').checked = fine.paid;
+
+      document.getElementById('editModal').style.display = 'flex';
+    }
+
+    window.onload = loadFines;
+  </script>
+
+</body>
+
+</html>

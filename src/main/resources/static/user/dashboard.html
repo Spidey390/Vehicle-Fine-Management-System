@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>User Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    .navbar {
+      background-color: #1c1c1c;
+      padding: 1rem 0;
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #00adb5;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 1rem;
+      padding-top: 2rem;
+      background: #1e1e1e;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    }
+
+    .input-section {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    input[type="text"] {
+      padding: 0.7rem;
+      width: 60%;
+      border-radius: 6px;
+      border: none;
+      font-size: 1rem;
+      margin-right: 1rem;
+    }
+
+    button {
+      padding: 0.7rem 1.2rem;
+      background-color: #00adb5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #2e2e2e;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid #444;
+    }
+
+    th {
+      background-color: #00adb5;
+      color: white;
+    }
+
+    tr:hover {
+      background-color: #3a3a3a;
+    }
+
+    .status-unpaid {
+      color: orange;
+    }
+
+    .status-paid {
+      color: lightgreen;
+    }
+
+    .btn-pay,
+    .paid {
+      padding: 0.4rem 0.8rem;
+      background-color: #00adb5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .Submit {
+      padding: 0.4rem 0.8rem;
+      background-color: #00adb5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .btn-pay,
+    .Search,
+    .Submit:hover {
+      background-color: #02929a;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="navbar">User Dashboard</div>
+
+  <div class="container">
+    <div class="input-section">
+      <input type="text" id="vehicleInput" placeholder="Enter your vehicle number (e.g. MH12AB1234)">
+      <button class="Search" onclick="showFines()">Search</button>
+    </div>
+
+    <div id="fineTable" style="display:none;">
+      <h2 style="margin-bottom: 1rem;">Fines for Vehicle: <span id="vehicleDisplay"></span></h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Ticket ID</th>
+            <th>Offense</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="fineBody">
+          <!-- Dynamic rows will be injected here -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="paymentModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+background: rgba(0, 0, 0, 0.8); justify-content: center; align-items: center; z-index: 999;">
+    <div style="background: #1e1e1e; padding: 2rem; border-radius: 10px; text-align: center; width: 300px;">
+      <h3>Scan QR to Pay</h3>
+      <img src="Qr.jpg" alt="QR Code" style="width: 200px; height: 200px; margin: 1rem 0;">
+      <input type="text" id="utrInput" placeholder="Enter UTR number"
+        style="padding: 0.5rem; width: 100%; border-radius: 5px; border: none; margin-bottom: 1rem;">
+      <br>
+      <button onclick="submitPayment()" style="background: #00adb5; padding: 0.5rem 1rem;">Submit</button>
+      <br><br>
+      <button onclick="closeModal()" style="background: red; padding: 0.5rem 1rem;">Cancel</button>
+    </div>
+  </div>
+
+
+  <script>
+    let currentFineId = null;
+    let finesData = [];
+
+    async function payFine(id) {
+      currentFineId = id;
+      document.getElementById('utrInput').value = '';
+      document.getElementById('paymentModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('paymentModal').style.display = 'none';
+    }
+
+    async function submitPayment() {
+      const utr = document.getElementById('utrInput').value.trim();
+      if (!utr) return alert("Please enter the UTR number");
+
+      const res = await fetch(`/api/user/fines/${currentFineId}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ utr })
+      });
+
+      if (res.ok) {
+        closeModal();
+        showFines(); // Refresh table
+      } else {
+        alert("Payment failed");
+      }
+    }
+
+    async function showFines() {
+      const vehicleNo = document.getElementById('vehicleInput').value.trim();
+      if (!vehicleNo) return alert("Please enter a vehicle number");
+
+      document.getElementById('vehicleDisplay').textContent = vehicleNo;
+
+      // Fetch the fines using vehicle number
+      const res = await fetch(`/api/user/fines?vehicle_no=${encodeURIComponent(vehicleNo)}`);
+
+      if (!res.ok) {
+        alert("Failed to fetch fines");
+        return;
+      }
+
+      finesData = await res.json();
+      const tbody = document.getElementById('fineBody');
+      tbody.innerHTML = ''; // Clear any previous rows
+
+      // Display with sequential IDs (1, 2, 3...) instead of actual IDs
+      finesData.forEach((f, index) => {
+        const sequentialId = index + 1; // Start from 1
+        const row = document.createElement('tr');
+        row.innerHTML = `
+  <td>${sequentialId}</td>
+  <td>${f.offense}</td>
+  <td>${f.amount}</td>
+  <td class="${f.paid ? 'status-paid' : 'status-unpaid'}">${f.paid ? 'Paid' : 'Unpaid'}</td>
+  <td>${f.date}</td>
+  <td>${f.paid ? '<button class="paid" disabled>paid</button>' : `<button class="btn-pay"
+      onclick="payFine(${f.id})">Pay</button>`}</td>
+  `;
+        tbody.appendChild(row);
+      });
+
+      document.getElementById('fineTable').style.display = 'block';
+    }
+  </script>
+
+</body>
+
+</html>
